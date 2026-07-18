@@ -1,12 +1,15 @@
 #include "framework/Common.h"
 
-// This executable is a device-ABI link gate. Runtime startup is enabled only
-// after every platform and third-party dependency is represented honestly.
+void SkinDeepIOS_RecordStartupBegin(void);
+void SkinDeepIOS_RecordStartupSuccess(void);
+
 int main(int argc, char **argv) {
+    SkinDeepIOS_RecordStartupBegin();
     if (argc > 1) {
         common->Init(argc - 1, &argv[1]);
     } else {
         common->Init(0, nullptr);
     }
+    SkinDeepIOS_RecordStartupSuccess();
     return 0;
 }
