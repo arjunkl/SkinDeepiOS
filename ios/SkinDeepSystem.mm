@@ -1,11 +1,22 @@
-#import <Foundation/Foundation.h>
+#import <UIKit/UIKit.h>
 
 #include <sys/param.h>
+#include <unistd.h>
+
+#include <string>
 
 #include "framework/Common.h"
+#include "framework/CVarSystem.h"
 #include "idlib/Str.h"
 #include "sys/posix/posix_public.h"
+#include "sys/sys_local.h"
 #include "sys/sys_public.h"
+
+int screen_width = 1280;
+int screen_height = 720;
+int gl_format = 0x8888;
+int gl_depth_bits = 24;
+int gl_msaa = 0;
 
 static NSURL *SDApplicationSupportURL(void) {
     NSFileManager *files = NSFileManager.defaultManager;
@@ -54,6 +65,102 @@ void Sys_Shutdown(void) {
 
 int Sys_GetSystemRam(void) {
     return (int)(NSProcessInfo.processInfo.physicalMemory / (1024ULL * 1024ULL));
+}
+
+const char *Sys_ApplicationHomePath(void) {
+    static const std::string path = [] {
+        @autoreleasepool {
+            return std::string(SDApplicationSupportURL().fileSystemRepresentation);
+        }
+    }();
+    return path.c_str();
+}
+
+FILE *Sys_tmpfile(void) {
+    @autoreleasepool {
+        NSString *pattern = [NSTemporaryDirectory()
+            stringByAppendingPathComponent:@"skindeep-XXXXXX"];
+        char fileName[MAXPATHLEN];
+        if (![pattern getFileSystemRepresentation:fileName
+                                         maxLength:sizeof(fileName)]) {
+            return nullptr;
+        }
+        int descriptor = mkstemp(fileName);
+        if (descriptor < 0) {
+            return nullptr;
+        }
+        unlink(fileName);
+        FILE *file = fdopen(descriptor, "w+b");
+        if (file == nullptr) {
+            close(descriptor);
+        }
+        return file;
+    }
+}
+
+void Sys_SyncState(void) {}
+
+void Sys_Analog(int &side, int &forward, const int &keyMoveSpeed) {
+    (void)side;
+    (void)forward;
+    (void)keyMoveSpeed;
+}
+
+void Android_PollInput(void) {}
+
+float Android_GetConsoleMaxHeightFrac(float fraction) {
+    return fraction;
+}
+
+bool GLimp_CheckGLInitialized(void) {
+    return true;
+}
+
+void Sys_ForceResolution(void) {
+    @autoreleasepool {
+        CGRect bounds = UIScreen.mainScreen.nativeBounds;
+        if (bounds.size.width > 0.0 && bounds.size.height > 0.0) {
+            screen_width = (int)bounds.size.width;
+            screen_height = (int)bounds.size.height;
+        }
+    }
+    cvarSystem->SetCVarBool("r_fullscreen", true);
+    cvarSystem->SetCVarInteger("r_mode", -1);
+    cvarSystem->SetCVarInteger("r_customWidth", screen_width);
+    cvarSystem->SetCVarInteger("r_customHeight", screen_height);
+}
+
+const char *OSX_GetLocalizedString(const char *value) {
+    return value;
+}
+
+bool OSX_GetCPUIdentification(int &cpuId, bool &oldArchitecture) {
+    cpuId = 0;
+    oldArchitecture = false;
+    return true;
+}
+
+void OSX_GetVideoCard(int &vendorId, int &deviceId) {
+    vendorId = -1;
+    deviceId = -1;
+}
+
+void idSysLocal::OpenURL(const char *url, bool quit) {
+    (void)quit;
+    if (url == nullptr || url[0] == '\0') {
+        return;
+    }
+    @autoreleasepool {
+        NSURL *target = [NSURL URLWithString:[NSString stringWithUTF8String:url]];
+        if (target == nil) {
+            return;
+        }
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [UIApplication.sharedApplication openURL:target
+                                             options:@{}
+                                   completionHandler:nil];
+        });
+    }
 }
 
 void Sys_DoStartProcess(const char *exeName, bool dofork) {
