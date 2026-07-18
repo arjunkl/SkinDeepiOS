@@ -1,3 +1,5 @@
+#include <SDL_main.h>
+
 #include "framework/Common.h"
 
 void SkinDeepIOS_RecordStartupBegin(void);
