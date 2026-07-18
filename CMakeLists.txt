@@ -110,6 +110,9 @@ if(SKINDEEP_BUILD_ENGINE_ARCHIVE)
             "-framework OpenAL"
             z
         )
+        # The Xcode generator otherwise schedules jpeg_objs but can omit the
+        # thin jpeg_static archive before linking this bundle.
+        add_dependencies(SkinDeepEngineLinkProbe jpeg_static)
         set_target_properties(SkinDeepEngineLinkProbe PROPERTIES
             MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/ios/Info.plist.in"
             XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED "NO"
