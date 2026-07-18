@@ -129,6 +129,7 @@ def main() -> None:
         '#endif\n'
         'typedef double GLdouble;\n'
         'typedef double GLclampd;\n'
+        '#include <SDL_opengl_glext.h>\n'
         '#else\n'
         '#include <SDL_opengl.h>\n'
         '#endif',
