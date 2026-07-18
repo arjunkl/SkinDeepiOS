@@ -10,6 +10,14 @@ on:
       - cmake/**
       - ios/**
       - .github/workflows/ios-bootstrap-smoke.yml
+  pull_request:
+    branches:
+      - main
+    paths:
+      - CMakeLists.txt
+      - cmake/**
+      - ios/**
+      - .github/workflows/ios-bootstrap-smoke.yml
 
 permissions:
   contents: read
