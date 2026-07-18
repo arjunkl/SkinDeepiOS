@@ -217,6 +217,20 @@ def main() -> None:
         "iOS vsnprintf portability",
     )
     string_cpp.write_text(string_text, encoding="utf-8")
+
+    jpeg_config = (
+        args.engine_root
+        / "Q3E/src/main/jni/deplibs/libjpeg/libjpeg/jconfig.h"
+    )
+    jpeg_config.write_text(
+        "#pragma once\n"
+        "#define HAVE_PROTOTYPES 1\n"
+        "#define HAVE_UNSIGNED_CHAR 1\n"
+        "#define HAVE_UNSIGNED_SHORT 1\n"
+        "#define HAVE_STDDEF_H 1\n"
+        "#define HAVE_STDLIB_H 1\n",
+        encoding="utf-8",
+    )
     print(f"Prepared {cmake}")
 
 
