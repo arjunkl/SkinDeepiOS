@@ -27,6 +27,11 @@ static NSURL *SDApplicationSupportURL(void) {
     withIntermediateDirectories:YES
                      attributes:nil
                           error:nil];
+    [files createDirectoryAtURL:[url URLByAppendingPathComponent:@"base"
+                                                     isDirectory:YES]
+    withIntermediateDirectories:YES
+                     attributes:nil
+                          error:nil];
     return url;
 }
 
@@ -37,6 +42,11 @@ static NSURL *SDDocumentsURL(void) {
     NSURL *url = [documents URLByAppendingPathComponent:@"SkinDeep"
                                             isDirectory:YES];
     [files createDirectoryAtURL:url
+    withIntermediateDirectories:YES
+                     attributes:nil
+                          error:nil];
+    [files createDirectoryAtURL:[url URLByAppendingPathComponent:@"base"
+                                                     isDirectory:YES]
     withIntermediateDirectories:YES
                      attributes:nil
                           error:nil];
