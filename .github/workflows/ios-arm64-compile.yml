@@ -9,7 +9,7 @@ on:
       - CMakeLists.txt
       - cmake/**
       - scripts/**
-      - .github/workflows/**
+      - .github/workflows/ios-arm64-compile.yml
   pull_request:
     branches:
       - main
@@ -17,7 +17,7 @@ on:
       - CMakeLists.txt
       - cmake/**
       - scripts/**
-      - .github/workflows/**
+      - .github/workflows/ios-arm64-compile.yml
 
 permissions:
   contents: read
