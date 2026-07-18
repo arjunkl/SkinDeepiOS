@@ -52,9 +52,11 @@ if(SKINDEEP_BUILD_BOOTSTRAP_APP)
         ios/SkinDeepBootstrap.mm
     )
     target_compile_features(SkinDeepBootstrap PRIVATE cxx_std_17)
+    target_compile_definitions(SkinDeepBootstrap PRIVATE GLES_SILENCE_DEPRECATION=1)
     target_link_libraries(SkinDeepBootstrap PRIVATE
         "-framework Foundation"
         "-framework UIKit"
+        "-framework CoreGraphics"
         "-framework QuartzCore"
         "-framework OpenGLES"
     )
