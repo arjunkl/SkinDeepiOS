@@ -206,6 +206,10 @@ def main() -> None:
         '#ifndef GL_OR\n'
         '#define GL_OR 0x1507\n'
         '#endif\n'
+        '#ifndef GL_STACK_OVERFLOW\n'
+        '#define GL_STACK_OVERFLOW 0x0503\n'
+        '#define GL_STACK_UNDERFLOW 0x0504\n'
+        '#endif\n'
         '#else\n'
         '#include <SDL_opengl.h>\n'
         '#endif',
