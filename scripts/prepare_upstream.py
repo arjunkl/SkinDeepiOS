@@ -372,6 +372,36 @@ def main() -> None:
     )
     string_cpp.write_text(string_text, encoding="utf-8")
 
+    common_cpp = (
+        args.engine_root
+        / "Q3E/src/main/jni/skindeep/framework/Common.cpp"
+    )
+    common_text = common_cpp.read_text(encoding="utf-8")
+    common_text = regex_once(
+        common_text,
+        r'(\t//3-25-2025: when we initialize OpenGL.*?\n)'
+        r'(\tif \(SDL_HasSSE41\(\) == SDL_FALSE\)\n\t\{.*?\n\t\})'
+        r'(\n\n\tidSIMD::InitProcessor)',
+        r'\1#if !defined(__IOS__)\n\2\n#endif\3',
+        "exclude desktop SSE requirement on iOS",
+    )
+    common_text = replace_once(
+        common_text,
+        '\tSys_Printf( "shutting down: %s\\n", errorMessage );\n\n'
+        '\tShutdown();\n\n'
+        '\tSys_Error( "%s", errorMessage );\n}',
+        '\tSys_Printf( "shutting down: %s\\n", errorMessage );\n\n'
+        '#if defined(__IOS__)\n'
+        '\t// Partial engine initialization has no safe teardown boundary yet.\n'
+        '\tSys_Error( "%s", errorMessage );\n'
+        '#else\n'
+        '\tShutdown();\n\n'
+        '\tSys_Error( "%s", errorMessage );\n'
+        '#endif\n}',
+        "safe iOS early-fatal exit",
+    )
+    common_cpp.write_text(common_text, encoding="utf-8")
+
     posix_main = (
         args.engine_root
         / "Q3E/src/main/jni/skindeep/sys/posix/posix_main.cpp"
