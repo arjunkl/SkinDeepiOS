@@ -132,7 +132,19 @@ jobs:
           printf '%s\n' "${launch_output}" | tee "${artifact_dir}/launch.txt"
 
           for attempt in $(seq 1 60); do
-            test -f "${evidence}" && break
+            if test -f "${evidence}" && python3 - "${evidence}" <<'PY'
+          import json
+          import sys
+
+          try:
+              status = json.load(open(sys.argv[1], encoding="utf-8")).get("status")
+          except (OSError, ValueError):
+              raise SystemExit(1)
+          raise SystemExit(0 if status in {"fatal", "initialized"} else 1)
+          PY
+            then
+              break
+            fi
             sleep 1
           done
           test -f "${evidence}"
