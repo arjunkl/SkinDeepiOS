@@ -1,0 +1,105 @@
+name: Skin Deep iOS Engine Link Gate
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - CMakeLists.txt
+      - cmake/**
+      - ios/**
+      - scripts/**
+      - .github/workflows/**
+
+permissions:
+  contents: read
+
+concurrency:
+  group: skindeep-ios-engine-link-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  IDTECH4A_REPOSITORY: https://github.com/glKarin/com.n0n3m4.diii4a.git
+  IDTECH4A_COMMIT: c600f9a5c935494d43f264a336b3b46538d569b4
+  SDL_REPOSITORY: https://github.com/libsdl-org/SDL.git
+  SDL_COMMIT: 8236e01a9f758d15927624925c6043f84d8a261f
+
+jobs:
+  link:
+    name: Link Skin Deep core into an iPhoneOS executable
+    runs-on: macos-15
+    timeout-minutes: 90
+
+    steps:
+      - name: Check out iOS overlay
+        uses: actions/checkout@v4
+
+      - name: Fetch pinned sources
+        run: |
+          set -euxo pipefail
+          git init engine
+          git -C engine remote add origin "${IDTECH4A_REPOSITORY}"
+          git -C engine config core.sparseCheckout true
+          cat > engine/.git/info/sparse-checkout <<'EOF'
+          /Q3E/src/main/jni/skindeep/
+          /Q3E/src/main/jni/common/
+          /Q3E/src/main/jni/depincs/
+          /Q3E/src/main/jni/deplibs/SDL2/include/
+          /Q3E/src/main/jni/deplibs/libjpeg/libjpeg/
+          /Q3E/src/main/jni/deplibs/libogg/include/
+          /Q3E/src/main/jni/deplibs/libvorbis/include/
+          /Q3E/src/main/jni/deplibs/curl/include/
+          EOF
+          git -C engine fetch --depth 1 --filter=blob:none origin "${IDTECH4A_COMMIT}"
+          git -C engine checkout --detach FETCH_HEAD
+          test "$(git -C engine rev-parse HEAD)" = "${IDTECH4A_COMMIT}"
+
+          git init sdl
+          git -C sdl remote add origin "${SDL_REPOSITORY}"
+          git -C sdl fetch --depth 1 --filter=blob:none origin "${SDL_COMMIT}"
+          git -C sdl checkout --detach FETCH_HEAD
+          test "$(git -C sdl rev-parse HEAD)" = "${SDL_COMMIT}"
+
+      - name: Prepare linkable iOS engine
+        run: python3 scripts/prepare_upstream.py engine
+
+      - name: Configure iPhoneOS executable
+        run: |
+          set -euxo pipefail
+          cmake -S . -B link-build -G Xcode \
+            -DCMAKE_TOOLCHAIN_FILE="${PWD}/cmake/ios-arm64.toolchain.cmake" \
+            -DENGINE_ROOT="${PWD}/engine" \
+            -DSDL_ROOT="${PWD}/sdl" \
+            -DSKINDEEP_BUILD_ENGINE_LINK_PROBE=ON \
+            -DSKINDEEP_BUILD_BOOTSTRAP_APP=OFF \
+            -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build linked engine executable
+        run: |
+          set -euxo pipefail
+          cmake --build link-build --config Release --target SkinDeepEngineLinkProbe \
+            -- -sdk iphoneos CODE_SIGNING_ALLOWED=NO ONLY_ACTIVE_ARCH=YES ARCHS=arm64
+
+      - name: Verify executable
+        run: |
+          set -euxo pipefail
+          mkdir -p artifacts/SkinDeepEngineLinkProbe-iphoneos-arm64
+          app="$(find link-build -type d -name 'SkinDeepEngineLinkProbe.app' -print -quit)"
+          executable="${app}/SkinDeepEngineLinkProbe"
+          test -f "${executable}"
+          file "${executable}" | tee artifacts/SkinDeepEngineLinkProbe-iphoneos-arm64/file.txt
+          lipo -info "${executable}" | tee artifacts/SkinDeepEngineLinkProbe-iphoneos-arm64/lipo.txt
+          xcrun nm -arch arm64 "${executable}" \
+            | grep -E '(_main|_GetGameAPI|_gameLocal)$' \
+            | tee artifacts/SkinDeepEngineLinkProbe-iphoneos-arm64/engine-symbols.txt
+          ditto -c -k --keepParent "${app}" \
+            artifacts/SkinDeepEngineLinkProbe-iphoneos-arm64/SkinDeepEngineLinkProbe.app.zip
+
+      - name: Upload link evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: SkinDeepEngineLinkProbe-iphoneos-arm64
+          path: artifacts/SkinDeepEngineLinkProbe-iphoneos-arm64
+          if-no-files-found: error
+          retention-days: 14
