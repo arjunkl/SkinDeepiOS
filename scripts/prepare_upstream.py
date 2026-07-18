@@ -135,6 +135,36 @@ def main() -> None:
         "iOS OpenGL ES 3 headers",
     )
     qgl.write_text(qgl_text, encoding="utf-8")
+
+    string_cpp = args.engine_root / "Q3E/src/main/jni/skindeep/idlib/Str.cpp"
+    string_text = string_cpp.read_text(encoding="utf-8")
+    string_text = replace_once(
+        string_text,
+        '#if !defined(__ANDROID__) //karin: using vsnprintf directly on Android\n'
+        '#undef _vsnprintf\n'
+        '#endif\n'
+        '\tret = _vsnprintf( dest, size-1, fmt, argptr );\n'
+        '#if !defined(__ANDROID__) //karin: using vsnprintf directly on Android\n'
+        '#define _vsnprintf\tuse_idStr_vsnPrintf\n'
+        '#endif',
+        '#if defined(__IOS__)\n'
+        '#undef vsnprintf\n'
+        '#undef _vsnprintf\n'
+        '\tret = ::vsnprintf( dest, size-1, fmt, argptr );\n'
+        '#define vsnprintf\tuse_idStr_vsnPrintf\n'
+        '#define _vsnprintf\tuse_idStr_vsnPrintf\n'
+        '#else\n'
+        '#if !defined(__ANDROID__) //karin: using vsnprintf directly on Android\n'
+        '#undef _vsnprintf\n'
+        '#endif\n'
+        '\tret = _vsnprintf( dest, size-1, fmt, argptr );\n'
+        '#if !defined(__ANDROID__) //karin: using vsnprintf directly on Android\n'
+        '#define _vsnprintf\tuse_idStr_vsnPrintf\n'
+        '#endif\n'
+        '#endif',
+        "iOS vsnprintf portability",
+    )
+    string_cpp.write_text(string_text, encoding="utf-8")
     print(f"Prepared {cmake}")
 
 
