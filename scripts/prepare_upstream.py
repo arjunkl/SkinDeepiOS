@@ -63,6 +63,13 @@ def main() -> None:
         "X11 exclusion",
     )
 
+    text = replace_once(
+        text,
+        'if(CMAKE_COMPILER_IS_GNUCC OR CMAKE_C_COMPILER_ID STREQUAL "Clang")',
+        'if(CMAKE_COMPILER_IS_GNUCC OR CMAKE_C_COMPILER_ID MATCHES "^(Apple)?Clang$")',
+        "AppleClang compiler identity",
+    )
+
     text = regex_once(
         text,
         r'\telseif\(APPLE\)\n\t\tadd_definitions\(-DMACOS_X=1\).*?'
