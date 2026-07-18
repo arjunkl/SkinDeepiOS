@@ -24,6 +24,10 @@ env:
   IDTECH4A_COMMIT: c600f9a5c935494d43f264a336b3b46538d569b4
   SDL_REPOSITORY: https://github.com/libsdl-org/SDL.git
   SDL_COMMIT: 8236e01a9f758d15927624925c6043f84d8a261f
+  OGG_REPOSITORY: https://github.com/xiph/ogg.git
+  OGG_COMMIT: e1774cd77f471443541596e09078e78fdc342e4f
+  VORBIS_REPOSITORY: https://github.com/xiph/vorbis.git
+  VORBIS_COMMIT: 0657aee69dec8508a0011f47f3b69d7538e9d262
 
 jobs:
   link:
@@ -46,7 +50,7 @@ jobs:
           /Q3E/src/main/jni/common/
           /Q3E/src/main/jni/depincs/
           /Q3E/src/main/jni/deplibs/SDL2/include/
-          /Q3E/src/main/jni/deplibs/libjpeg/libjpeg/
+          /Q3E/src/main/jni/deplibs/libjpeg/
           /Q3E/src/main/jni/deplibs/libogg/include/
           /Q3E/src/main/jni/deplibs/libvorbis/include/
           /Q3E/src/main/jni/deplibs/curl/include/
@@ -61,6 +65,18 @@ jobs:
           git -C sdl checkout --detach FETCH_HEAD
           test "$(git -C sdl rev-parse HEAD)" = "${SDL_COMMIT}"
 
+          git init ogg
+          git -C ogg remote add origin "${OGG_REPOSITORY}"
+          git -C ogg fetch --depth 1 --filter=blob:none origin "${OGG_COMMIT}"
+          git -C ogg checkout --detach FETCH_HEAD
+          test "$(git -C ogg rev-parse HEAD)" = "${OGG_COMMIT}"
+
+          git init vorbis
+          git -C vorbis remote add origin "${VORBIS_REPOSITORY}"
+          git -C vorbis fetch --depth 1 --filter=blob:none origin "${VORBIS_COMMIT}"
+          git -C vorbis checkout --detach FETCH_HEAD
+          test "$(git -C vorbis rev-parse HEAD)" = "${VORBIS_COMMIT}"
+
       - name: Prepare linkable iOS engine
         run: python3 scripts/prepare_upstream.py engine
 
@@ -71,6 +87,8 @@ jobs:
             -DCMAKE_TOOLCHAIN_FILE="${PWD}/cmake/ios-arm64.toolchain.cmake" \
             -DENGINE_ROOT="${PWD}/engine" \
             -DSDL_ROOT="${PWD}/sdl" \
+            -DOGG_ROOT="${PWD}/ogg" \
+            -DVORBIS_ROOT="${PWD}/vorbis" \
             -DSKINDEEP_BUILD_ENGINE_LINK_PROBE=ON \
             -DSKINDEEP_BUILD_BOOTSTRAP_APP=OFF \
             -DCMAKE_BUILD_TYPE=Release
