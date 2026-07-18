@@ -68,8 +68,8 @@ def main() -> None:
         'if(DIII4A)\n\tset(JPEG_INCLUDE_DIR "${DIII4A_DEPEND_LIBRARY_PATH}/libjpeg/libjpeg")\n'
         '\tset(JPEG_LIBRARY "jpeg")',
         'if(DIII4A)\n\tset(JPEG_INCLUDE_DIR "${DIII4A_DEPEND_LIBRARY_PATH}/libjpeg/libjpeg")\n'
-        '\tif(CMAKE_SYSTEM_NAME STREQUAL "iOS" AND TARGET jpeg)\n'
-        '\t\tset(JPEG_LIBRARY jpeg)\n'
+        '\tif(CMAKE_SYSTEM_NAME STREQUAL "iOS" AND TARGET jpeg_static)\n'
+        '\t\tset(JPEG_LIBRARY jpeg_static)\n'
         '\telse()\n'
         '\t\tset(JPEG_LIBRARY "jpeg")\n'
         '\tendif()',
