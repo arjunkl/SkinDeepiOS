@@ -30,16 +30,65 @@ static NSURL *SDApplicationSupportURL(void) {
     return url;
 }
 
+static NSURL *SDDocumentsURL(void) {
+    NSFileManager *files = NSFileManager.defaultManager;
+    NSURL *documents = [files URLsForDirectory:NSDocumentDirectory
+                                      inDomains:NSUserDomainMask].firstObject;
+    NSURL *url = [documents URLByAppendingPathComponent:@"SkinDeep"
+                                            isDirectory:YES];
+    [files createDirectoryAtURL:url
+    withIntermediateDirectories:YES
+                     attributes:nil
+                          error:nil];
+    return url;
+}
+
+static void SDWriteStartupEvidence(NSString *status, NSString *message) {
+    @autoreleasepool {
+        NSDictionary *evidence = @{
+            @"marker": @"SKINDEEP_ENGINE_STARTUP",
+            @"phase": @"common_init",
+            @"status": status,
+            @"message": message ?: @"",
+            @"pid": @(NSProcessInfo.processInfo.processIdentifier),
+        };
+        NSError *error = nil;
+        NSData *data = [NSJSONSerialization dataWithJSONObject:evidence
+                                                       options:NSJSONWritingPrettyPrinted
+                                                         error:&error];
+        NSURL *url = [SDDocumentsURL() URLByAppendingPathComponent:@"startup.json"];
+        if (data == nil || ![data writeToURL:url options:NSDataWritingAtomic error:&error]) {
+            fprintf(stderr, "SKINDEEP_STARTUP_EVIDENCE_WRITE_FAILED: %s\n",
+                    error.localizedDescription.UTF8String ?: "unknown error");
+        } else {
+            fprintf(stderr, "SKINDEEP_STARTUP_EVIDENCE: %s\n",
+                    url.fileSystemRepresentation);
+        }
+        fflush(stderr);
+    }
+}
+
+void SkinDeepIOS_RecordStartupBegin(void) {
+    SDWriteStartupEvidence(@"started", @"");
+}
+
+void SkinDeepIOS_RecordStartupSuccess(void) {
+    SDWriteStartupEvidence(@"initialized", @"");
+}
+
+void SkinDeepIOS_RecordFatalError(const char *message) {
+    NSString *text = message == nullptr
+        ? @"Unknown engine fatal error"
+        : [NSString stringWithUTF8String:message];
+    SDWriteStartupEvidence(@"fatal", text);
+}
+
 bool Sys_GetPath(sysPath_t type, idStr &path) {
     @autoreleasepool {
         NSURL *url = nil;
         switch (type) {
             case PATH_BASE: {
-                NSURL *documents = [NSFileManager.defaultManager
-                    URLsForDirectory:NSDocumentDirectory
-                            inDomains:NSUserDomainMask].firstObject;
-                url = [documents URLByAppendingPathComponent:@"SkinDeep"
-                                                  isDirectory:YES];
+                url = SDDocumentsURL();
                 break;
             }
             case PATH_CONFIG:
