@@ -372,6 +372,41 @@ def main() -> None:
     )
     string_cpp.write_text(string_text, encoding="utf-8")
 
+    posix_main = (
+        args.engine_root
+        / "Q3E/src/main/jni/skindeep/sys/posix/posix_main.cpp"
+    )
+    posix_text = posix_main.read_text(encoding="utf-8")
+    posix_text = replace_once(
+        posix_text,
+        'void Sys_Error(const char *error, ...) {\n'
+        '\tva_list argptr;\n\n'
+        '\tSys_Printf( "Sys_Error: " );\n'
+        '\tva_start( argptr, error );\n'
+        '\tSys_DebugVPrintf( error, argptr );\n'
+        '\tva_end( argptr );\n'
+        '\tSys_Printf( "\\n" );\n\n'
+        '\tPosix_Exit( EXIT_FAILURE );\n'
+        '}',
+        '#if defined(__IOS__)\n'
+        'extern void SkinDeepIOS_RecordFatalError(const char *message);\n'
+        '#endif\n\n'
+        'void Sys_Error(const char *error, ...) {\n'
+        '\tva_list argptr;\n'
+        '\tchar message[MAX_STRING_CHARS];\n\n'
+        '\tva_start( argptr, error );\n'
+        '\tidStr::vsnPrintf( message, sizeof(message), error, argptr );\n'
+        '\tva_end( argptr );\n'
+        '\tSys_Printf( "Sys_Error: %s\\n", message );\n'
+        '#if defined(__IOS__)\n'
+        '\tSkinDeepIOS_RecordFatalError(message);\n'
+        '#endif\n\n'
+        '\tPosix_Exit( EXIT_FAILURE );\n'
+        '}',
+        "iOS fatal startup evidence",
+    )
+    posix_main.write_text(posix_text, encoding="utf-8")
+
     jpeg_config = (
         args.engine_root
         / "Q3E/src/main/jni/deplibs/libjpeg/libjpeg/jconfig.h"
