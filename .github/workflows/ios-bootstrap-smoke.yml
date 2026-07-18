@@ -1,0 +1,121 @@
+name: Skin Deep iOS Simulator Bootstrap
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - agent/bootstrap-skin-deep-ios
+    paths:
+      - CMakeLists.txt
+      - cmake/**
+      - ios/**
+      - .github/workflows/ios-bootstrap-smoke.yml
+  pull_request:
+    branches:
+      - main
+    paths:
+      - CMakeLists.txt
+      - cmake/**
+      - ios/**
+      - .github/workflows/ios-bootstrap-smoke.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: skindeep-ios-bootstrap-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  simulator-smoke:
+    name: Launch platform bootstrap in iOS Simulator
+    runs-on: macos-15
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out iOS overlay
+        uses: actions/checkout@v4
+
+      - name: Record Apple toolchain
+        run: |
+          set -euxo pipefail
+          xcodebuild -version
+          xcrun --sdk iphonesimulator --show-sdk-version
+          uname -m
+          cmake --version
+
+      - name: Configure simulator app
+        run: |
+          set -euxo pipefail
+          cmake -S . -B simulator-build -G Xcode \
+            -DCMAKE_TOOLCHAIN_FILE="${PWD}/cmake/ios-simulator.toolchain.cmake" \
+            -DSIMULATOR_ARCH="$(uname -m)" \
+            -DSKINDEEP_BUILD_ENGINE_ARCHIVE=OFF \
+            -DSKINDEEP_BUILD_BOOTSTRAP_APP=ON \
+            -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build unsigned simulator app
+        run: |
+          set -euxo pipefail
+          cmake --build simulator-build --config Release --target SkinDeepBootstrap \
+            -- -sdk iphonesimulator CODE_SIGNING_ALLOWED=NO
+          app="$(find simulator-build -type d -name 'SkinDeepBootstrap.app' -print -quit)"
+          test -n "${app}"
+          printf '%s\n' "${app}" > simulator-app-path.txt
+          plutil -p "${app}/Info.plist"
+          file "${app}/SkinDeepBootstrap"
+
+      - name: Boot, install, and launch
+        run: |
+          set -euxo pipefail
+          runtime="$(xcrun simctl list runtimes available -j | python3 -c 'import json,sys; xs=[x for x in json.load(sys.stdin)["runtimes"] if x["platform"]=="iOS" and x["isAvailable"]]; print(sorted(xs,key=lambda x:tuple(map(int,x["version"].split("."))))[-1]["identifier"])')"
+          device_type="$(xcrun simctl list devicetypes -j | python3 -c 'import json,sys; xs=[x for x in json.load(sys.stdin)["devicetypes"] if x["name"].startswith("iPhone")]; preferred=[x for x in xs if x["name"]=="iPhone 16 Pro"]; print((preferred or xs)[0]["identifier"])')"
+          udid="$(xcrun simctl create 'SkinDeep CI' "${device_type}" "${runtime}")"
+          printf '%s\n' "${udid}" > simulator-udid.txt
+          xcrun simctl boot "${udid}"
+          xcrun simctl bootstatus "${udid}" -b
+
+          app="$(cat simulator-app-path.txt)"
+          xcrun simctl install "${udid}" "${app}"
+          xcrun simctl launch "${udid}" org.skindeep.ios.bootstrap
+
+          container="$(xcrun simctl get_app_container "${udid}" org.skindeep.ios.bootstrap data)"
+          evidence="${container}/Documents/bootstrap.json"
+          for attempt in $(seq 1 20); do
+            test -f "${evidence}" && break
+            sleep 1
+          done
+          test -f "${evidence}"
+          mkdir -p artifacts/SkinDeepBootstrap-simulator
+          cp "${evidence}" artifacts/SkinDeepBootstrap-simulator/bootstrap.json
+          xcrun simctl io "${udid}" screenshot artifacts/SkinDeepBootstrap-simulator/bootstrap.png
+          xcrun simctl spawn "${udid}" log show --style compact --last 2m \
+            --predicate 'process == "SkinDeepBootstrap"' \
+            > artifacts/SkinDeepBootstrap-simulator/bootstrap.log
+
+          python3 - artifacts/SkinDeepBootstrap-simulator/bootstrap.json <<'PY'
+          import json
+          import sys
+
+          evidence = json.load(open(sys.argv[1], encoding="utf-8"))
+          assert evidence["marker"] == "SKINDEEP_BOOTSTRAP_READY", evidence
+          assert evidence["status"] == "ready", evidence
+          assert evidence["filesystem_ready"] is True, evidence
+          assert evidence["context_ready"] is True, evidence
+          assert evidence["graphics_api"] == "OpenGL ES 3", evidence
+          assert evidence["gl_version"], evidence
+          print(json.dumps(evidence, indent=2, sort_keys=True))
+          PY
+
+          ditto -c -k --keepParent "${app}" artifacts/SkinDeepBootstrap-simulator/SkinDeepBootstrap.app.zip
+          xcrun simctl terminate "${udid}" org.skindeep.ios.bootstrap
+          xcrun simctl shutdown "${udid}"
+          xcrun simctl delete "${udid}"
+
+      - name: Upload simulator evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: SkinDeepBootstrap-simulator
+          path: artifacts/SkinDeepBootstrap-simulator
+          if-no-files-found: error
+          retention-days: 14

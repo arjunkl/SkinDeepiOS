@@ -1,0 +1,116 @@
+name: Skin Deep iOS ARM64 Compile Gate
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - agent/bootstrap-skin-deep-ios
+    paths:
+      - CMakeLists.txt
+      - cmake/**
+      - scripts/**
+      - .github/workflows/ios-arm64-compile.yml
+  pull_request:
+    branches:
+      - main
+    paths:
+      - CMakeLists.txt
+      - cmake/**
+      - scripts/**
+      - .github/workflows/ios-arm64-compile.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: skindeep-ios-arm64-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  IDTECH4A_REPOSITORY: https://github.com/glKarin/com.n0n3m4.diii4a.git
+  IDTECH4A_COMMIT: c600f9a5c935494d43f264a336b3b46538d569b4
+
+jobs:
+  compile:
+    name: Compile Skin Deep core for iPhoneOS arm64
+    runs-on: macos-15
+    timeout-minutes: 90
+
+    steps:
+      - name: Check out iOS overlay
+        uses: actions/checkout@v4
+
+      - name: Record Apple toolchain
+        run: |
+          set -euxo pipefail
+          xcodebuild -version
+          xcrun --sdk iphoneos --show-sdk-version
+          xcrun --sdk iphoneos --show-sdk-path
+          clang --version
+          cmake --version
+
+      - name: Fetch pinned idTech4A++ source subset
+        run: |
+          set -euxo pipefail
+          git init engine
+          git -C engine remote add origin "${IDTECH4A_REPOSITORY}"
+          git -C engine config core.sparseCheckout true
+          cat > engine/.git/info/sparse-checkout <<'EOF'
+          /Q3E/src/main/jni/skindeep/
+          /Q3E/src/main/jni/common/
+          /Q3E/src/main/jni/depincs/
+          /Q3E/src/main/jni/deplibs/SDL2/include/
+          /Q3E/src/main/jni/deplibs/libjpeg/libjpeg/
+          /Q3E/src/main/jni/deplibs/libogg/include/
+          /Q3E/src/main/jni/deplibs/libvorbis/include/
+          /Q3E/src/main/jni/deplibs/curl/include/
+          EOF
+          git -C engine fetch --depth 1 --filter=blob:none origin "${IDTECH4A_COMMIT}"
+          git -C engine checkout --detach FETCH_HEAD
+          test "$(git -C engine rev-parse HEAD)" = "${IDTECH4A_COMMIT}"
+
+      - name: Prepare compile-only iOS target
+        run: |
+          set -euxo pipefail
+          python3 scripts/prepare_upstream.py engine
+
+      - name: Configure iPhoneOS arm64
+        run: |
+          set -euxo pipefail
+          cmake -S . -B build -G Xcode \
+            -DCMAKE_TOOLCHAIN_FILE="${PWD}/cmake/ios-arm64.toolchain.cmake" \
+            -DENGINE_ROOT="${PWD}/engine" \
+            -DSKINDEEP_BUILD_BOOTSTRAP_APP=OFF \
+            -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build static engine and hard-linked gameplay code
+        run: |
+          set -euxo pipefail
+          cmake --build build --config Release --target SkinDeepCore skindeep_idlib \
+            -- -sdk iphoneos CODE_SIGNING_ALLOWED=NO ONLY_ACTIVE_ARCH=YES ARCHS=arm64
+
+      - name: Merge and verify archive
+        run: |
+          set -euxo pipefail
+          mkdir -p artifacts/SkinDeepCore-iphoneos-arm64
+          core="$(find build -type f -name 'libSkinDeepCore.a' -print -quit)"
+          idlib="$(find build -type f -name 'libskindeep_idlib.a' -print -quit)"
+          test -n "${core}"
+          test -n "${idlib}"
+          xcrun libtool -static -o artifacts/SkinDeepCore-iphoneos-arm64/libSkinDeepCore.a \
+            "${core}" "${idlib}"
+          lipo -info artifacts/SkinDeepCore-iphoneos-arm64/libSkinDeepCore.a | tee artifacts/SkinDeepCore-iphoneos-arm64/lipo.txt
+          file artifacts/SkinDeepCore-iphoneos-arm64/libSkinDeepCore.a | tee artifacts/SkinDeepCore-iphoneos-arm64/file.txt
+          xcrun nm -arch arm64 artifacts/SkinDeepCore-iphoneos-arm64/libSkinDeepCore.a \
+            | grep -E 'gameLocal|GetGameAPI' \
+            | head -n 20 \
+            | tee artifacts/SkinDeepCore-iphoneos-arm64/hardlink-symbols.txt
+          printf '%s\n' "${IDTECH4A_COMMIT}" > artifacts/SkinDeepCore-iphoneos-arm64/idtech4a-commit.txt
+
+      - name: Upload compile evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: SkinDeepCore-iphoneos-arm64
+          path: artifacts/SkinDeepCore-iphoneos-arm64
+          if-no-files-found: error
+          retention-days: 14
