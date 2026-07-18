@@ -9,7 +9,7 @@ on:
       - CMakeLists.txt
       - cmake/**
       - ios/**
-      - .github/workflows/ios-bootstrap-smoke.yml
+      - .github/workflows/**
   pull_request:
     branches:
       - main
@@ -17,7 +17,7 @@ on:
       - CMakeLists.txt
       - cmake/**
       - ios/**
-      - .github/workflows/ios-bootstrap-smoke.yml
+      - .github/workflows/**
 
 permissions:
   contents: read
