@@ -10,7 +10,7 @@ on:
       - cmake/**
       - ios/**
       - scripts/**
-      - .github/workflows/**
+      - .github/workflows/ios-engine-link.yml
 
 permissions:
   contents: read
@@ -89,6 +89,7 @@ jobs:
             -DSDL_ROOT="${PWD}/sdl" \
             -DOGG_ROOT="${PWD}/ogg" \
             -DVORBIS_ROOT="${PWD}/vorbis" \
+            -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
             -DSKINDEEP_BUILD_ENGINE_LINK_PROBE=ON \
             -DSKINDEEP_BUILD_BOOTSTRAP_APP=OFF \
             -DCMAKE_BUILD_TYPE=Release
