@@ -64,6 +64,10 @@ if(SKINDEEP_BUILD_ENGINE_ARCHIVE)
         endif()
         add_subdirectory("${VORBIS_ROOT}" vorbis EXCLUDE_FROM_ALL)
         add_subdirectory("${JNI_ROOT}/deplibs/libjpeg" libjpeg EXCLUDE_FROM_ALL)
+        # The bundled JPEG static target otherwise contains only an object
+        # generator expression, which Xcode 16 does not materialize as an
+        # archive. A native source forces the expected libtool phase.
+        target_sources(jpeg_static PRIVATE ios/JPEGArchiveAnchor.c)
     endif()
 
     add_subdirectory("${SKINDEEP_ROOT}" skindeep)
@@ -110,8 +114,6 @@ if(SKINDEEP_BUILD_ENGINE_ARCHIVE)
             "-framework OpenAL"
             z
         )
-        # The Xcode generator otherwise schedules jpeg_objs but can omit the
-        # thin jpeg_static archive before linking this bundle.
         add_dependencies(SkinDeepEngineLinkProbe jpeg_static)
         set_target_properties(SkinDeepEngineLinkProbe PROPERTIES
             MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/ios/Info.plist.in"
