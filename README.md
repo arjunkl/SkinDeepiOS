@@ -8,13 +8,14 @@ commercial Skin Deep game data. A legally owned copy of the game is required.
 
 ## Current status
 
-Milestone 1 is a compile-only foundation. Its GitHub Actions gate pins an exact
-idTech4A++ revision, compiles the Skin Deep engine and gameplay code into one
-ARM64 iPhoneOS static archive, and publishes that archive with provenance.
+Milestone 1 compiles the pinned Skin Deep engine and hard-linked gameplay code
+into an ARM64 iPhoneOS archive. Milestone 2 adds a native iOS platform
+bootstrap and launches it in a clean simulator to validate UIKit lifecycle,
+sandbox storage, and OpenGL ES 3 context creation.
 
-Passing this gate proves only that the selected sources compile for the Apple
-device ABI. It does **not** yet prove launch, rendering, audio, input, asset
-loading, signing, installation, or gameplay.
+The bootstrap is deliberately not described as an engine launch: attaching
+the idTech runtime, SDL lifecycle, shaders, audio, and input remains future
+work.
 
 ## Milestone 1
 
@@ -26,3 +27,16 @@ SkinDeepCore-iphoneos-arm64/libSkinDeepCore.a
 
 The workflow intentionally fetches no commercial data.
 
+## Milestone 2
+
+Run the **Skin Deep iOS Simulator Bootstrap** workflow. Its artifact contains:
+
+```text
+SkinDeepBootstrap-simulator/
+  SkinDeepBootstrap.app.zip
+  bootstrap.json
+  bootstrap.log
+  bootstrap.png
+```
+
+See [`docs/MILESTONE_2.md`](docs/MILESTONE_2.md) for the exact proof boundary.
