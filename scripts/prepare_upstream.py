@@ -228,6 +228,9 @@ def main() -> None:
         '#ifndef GL_RGB5\n'
         '#define GL_RGB5 0x8050\n'
         '#endif\n'
+        '#ifndef GL_TEXTURE_BORDER_COLOR\n'
+        '#define GL_TEXTURE_BORDER_COLOR 0x1004\n'
+        '#endif\n'
         '#else\n'
         '#include <SDL_opengl.h>\n'
         '#endif',
