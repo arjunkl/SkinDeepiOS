@@ -65,6 +65,17 @@ def main() -> None:
 
     text = replace_once(
         text,
+        '\tset(SDL2_LIBRARY "SDL2")',
+        '\tif(CMAKE_SYSTEM_NAME STREQUAL "iOS" AND TARGET SDL2-static)\n'
+        '\t\tset(SDL2_LIBRARY SDL2-static)\n'
+        '\telse()\n'
+        '\t\tset(SDL2_LIBRARY "SDL2")\n'
+        '\tendif()',
+        "static SDL target",
+    )
+
+    text = replace_once(
+        text,
         'if(CMAKE_COMPILER_IS_GNUCC OR CMAKE_C_COMPILER_ID STREQUAL "Clang")',
         'if(CMAKE_COMPILER_IS_GNUCC OR CMAKE_C_COMPILER_ID MATCHES "^(Apple)?Clang$")',
         "AppleClang compiler identity",
@@ -89,10 +100,21 @@ def main() -> None:
         text,
         r'elseif\(APPLE\)\n\tset\(OSX_RESOURCE_FILES.*?\nelseif\(WIN32\)',
         'elseif(APPLE)\n'
-        '\t# Platform entry points arrive in Milestone 2. A static archive may\n'
-        '\t# retain unresolved platform symbols without pretending to launch.\n'
-        '\tset(src_sys_base)\n'
-        '\tset(src_sys_core)\n'
+        '\tif(SKINDEEP_LINKABLE_IOS)\n'
+        '\t\tset(src_sys_base\n'
+        '\t\t\tsys/cpu.cpp\n'
+        '\t\t\tsys/threads.cpp\n'
+        '\t\t\tsys/events.cpp\n'
+        '\t\t\tsys/sys_local.cpp\n'
+        '\t\t\tsys/posix/posix_net.cpp\n'
+        '\t\t\tsys/posix/posix_main.cpp\n'
+        '\t\t)\n'
+        '\t\tset(src_sys_core sys/glimp.cpp)\n'
+        '\telse()\n'
+        '\t\t# The compile-only gate intentionally retains unresolved platform symbols.\n'
+        '\t\tset(src_sys_base)\n'
+        '\t\tset(src_sys_core)\n'
+        '\tendif()\n'
         'elseif(WIN32)',
         "iOS platform source boundary",
     )
