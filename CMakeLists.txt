@@ -105,6 +105,7 @@ if(SKINDEEP_BUILD_ENGINE_ARCHIVE)
         target_link_libraries(SkinDeepEngineLinkProbe PRIVATE
             SkinDeepCore
             skindeep_idlib
+            SDL2main
             SDL2-static
             "-framework Foundation"
             "-framework UIKit"
