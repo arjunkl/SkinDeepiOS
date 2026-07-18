@@ -1,0 +1,182 @@
+name: Skin Deep iOS Engine Startup Smoke
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - CMakeLists.txt
+      - cmake/**
+      - ios/**
+      - scripts/**
+      - .github/workflows/ios-engine-startup-smoke.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: skindeep-ios-engine-startup-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  IDTECH4A_REPOSITORY: https://github.com/glKarin/com.n0n3m4.diii4a.git
+  IDTECH4A_COMMIT: c600f9a5c935494d43f264a336b3b46538d569b4
+  SDL_REPOSITORY: https://github.com/libsdl-org/SDL.git
+  SDL_COMMIT: 8236e01a9f758d15927624925c6043f84d8a261f
+  OGG_REPOSITORY: https://github.com/xiph/ogg.git
+  OGG_COMMIT: e1774cd77f471443541596e09078e78fdc342e4f
+  VORBIS_REPOSITORY: https://github.com/xiph/vorbis.git
+  VORBIS_COMMIT: 0657aee69dec8508a0011f47f3b69d7538e9d262
+
+jobs:
+  startup-smoke:
+    name: Reach the missing-data boundary in iOS Simulator
+    runs-on: macos-15
+    timeout-minutes: 90
+
+    steps:
+      - name: Check out iOS overlay
+        uses: actions/checkout@v4
+
+      - name: Fetch pinned sources
+        run: |
+          set -euxo pipefail
+          git init engine
+          git -C engine remote add origin "${IDTECH4A_REPOSITORY}"
+          git -C engine config core.sparseCheckout true
+          cat > engine/.git/info/sparse-checkout <<'EOF'
+          /Q3E/src/main/jni/skindeep/
+          /Q3E/src/main/jni/common/
+          /Q3E/src/main/jni/depincs/
+          /Q3E/src/main/jni/deplibs/SDL2/include/
+          /Q3E/src/main/jni/deplibs/libjpeg/
+          /Q3E/src/main/jni/deplibs/libogg/include/
+          /Q3E/src/main/jni/deplibs/libvorbis/include/
+          /Q3E/src/main/jni/deplibs/curl/include/
+          EOF
+          git -C engine fetch --depth 1 --filter=blob:none origin "${IDTECH4A_COMMIT}"
+          git -C engine checkout --detach FETCH_HEAD
+          test "$(git -C engine rev-parse HEAD)" = "${IDTECH4A_COMMIT}"
+
+          for dependency in sdl ogg vorbis; do
+            git init "${dependency}"
+          done
+          git -C sdl remote add origin "${SDL_REPOSITORY}"
+          git -C sdl fetch --depth 1 --filter=blob:none origin "${SDL_COMMIT}"
+          git -C sdl checkout --detach FETCH_HEAD
+          test "$(git -C sdl rev-parse HEAD)" = "${SDL_COMMIT}"
+          git -C ogg remote add origin "${OGG_REPOSITORY}"
+          git -C ogg fetch --depth 1 --filter=blob:none origin "${OGG_COMMIT}"
+          git -C ogg checkout --detach FETCH_HEAD
+          test "$(git -C ogg rev-parse HEAD)" = "${OGG_COMMIT}"
+          git -C vorbis remote add origin "${VORBIS_REPOSITORY}"
+          git -C vorbis fetch --depth 1 --filter=blob:none origin "${VORBIS_COMMIT}"
+          git -C vorbis checkout --detach FETCH_HEAD
+          test "$(git -C vorbis rev-parse HEAD)" = "${VORBIS_COMMIT}"
+
+      - name: Prepare runtime-capable iOS engine
+        run: python3 scripts/prepare_upstream.py engine
+
+      - name: Configure simulator engine app
+        run: |
+          set -euxo pipefail
+          cmake -S . -B startup-build -G Xcode \
+            -DCMAKE_TOOLCHAIN_FILE="${PWD}/cmake/ios-simulator.toolchain.cmake" \
+            -DSIMULATOR_ARCH="$(uname -m)" \
+            -DENGINE_ROOT="${PWD}/engine" \
+            -DSDL_ROOT="${PWD}/sdl" \
+            -DOGG_ROOT="${PWD}/ogg" \
+            -DVORBIS_ROOT="${PWD}/vorbis" \
+            -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
+            -DSKINDEEP_BUILD_ENGINE_LINK_PROBE=ON \
+            -DSKINDEEP_BUILD_BOOTSTRAP_APP=OFF \
+            -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build simulator engine app
+        run: |
+          set -euxo pipefail
+          cmake --build startup-build --config Release --target SkinDeepEngineLinkProbe \
+            -- -sdk iphonesimulator CODE_SIGNING_ALLOWED=NO ONLY_ACTIVE_ARCH=YES ARCHS="$(uname -m)"
+          app="$(find startup-build -type d -name 'SkinDeepEngineLinkProbe.app' -print -quit)"
+          test -n "${app}"
+          printf '%s\n' "${app}" > startup-app-path.txt
+          file "${app}/SkinDeepEngineLinkProbe"
+
+      - name: Launch through common Init without commercial data
+        run: |
+          set -euxo pipefail
+          artifact_dir="${PWD}/artifacts/SkinDeepEngineStartup-simulator"
+          mkdir -p "${artifact_dir}"
+          runtime="$(xcrun simctl list runtimes available -j | python3 -c 'import json,sys; xs=[x for x in json.load(sys.stdin)["runtimes"] if x["platform"]=="iOS" and x["isAvailable"]]; print(sorted(xs,key=lambda x:tuple(map(int,x["version"].split("."))))[-1]["identifier"])')"
+          device_type="$(xcrun simctl list devicetypes -j | python3 -c 'import json,sys; xs=[x for x in json.load(sys.stdin)["devicetypes"] if x["name"].startswith("iPhone")]; preferred=[x for x in xs if x["name"]=="iPhone 16 Pro"]; print((preferred or xs)[0]["identifier"])')"
+          udid="$(xcrun simctl create 'SkinDeep Engine CI' "${device_type}" "${runtime}")"
+          cleanup() {
+            xcrun simctl shutdown "${udid}" >/dev/null 2>&1 || true
+            xcrun simctl delete "${udid}" >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+          xcrun simctl boot "${udid}"
+          xcrun simctl bootstatus "${udid}" -b
+
+          app="$(cat startup-app-path.txt)"
+          bundle_id="org.skindeep.ios.engine-link-probe"
+          xcrun simctl install "${udid}" "${app}"
+          container="$(xcrun simctl get_app_container "${udid}" "${bundle_id}" data)"
+          evidence="${container}/Documents/SkinDeep/startup.json"
+
+          launch_output="$(xcrun simctl launch --terminate-running-process \
+            --stdout="${artifact_dir}/stdout.log" \
+            --stderr="${artifact_dir}/stderr.log" \
+            "${udid}" "${bundle_id}")"
+          printf '%s\n' "${launch_output}" | tee "${artifact_dir}/launch.txt"
+
+          for attempt in $(seq 1 60); do
+            test -f "${evidence}" && break
+            sleep 1
+          done
+          test -f "${evidence}"
+          cp "${evidence}" "${artifact_dir}/startup.json"
+
+          python3 - "${artifact_dir}/startup.json" <<'PY'
+          import json
+          import sys
+
+          evidence = json.load(open(sys.argv[1], encoding="utf-8"))
+          assert evidence["marker"] == "SKINDEEP_ENGINE_STARTUP", evidence
+          assert evidence["phase"] == "common_init", evidence
+          assert evidence["status"] == "fatal", evidence
+          assert "Couldn't load default.cfg" in evidence["message"], evidence
+          print(json.dumps(evidence, indent=2, sort_keys=True))
+          PY
+
+          sleep 2
+          set +e
+          xcrun simctl terminate "${udid}" "${bundle_id}" \
+            >"${artifact_dir}/post-evidence-terminate.txt" 2>&1
+          terminate_status=$?
+          set -e
+          test "${terminate_status}" -ne 0
+
+          xcrun simctl spawn "${udid}" log show --style compact --last 5m \
+            --predicate 'process == "SkinDeepEngineLinkProbe"' \
+            > "${artifact_dir}/unified.log"
+
+          crash_dir="${HOME}/Library/Developer/CoreSimulator/Devices/${udid}/data/Library/Logs/CrashReporter"
+          if test -d "${crash_dir}"; then
+            find "${crash_dir}" -type f -name 'SkinDeepEngineLinkProbe*' \
+              -print > "${artifact_dir}/crash-reports.txt"
+          else
+            : > "${artifact_dir}/crash-reports.txt"
+          fi
+          test ! -s "${artifact_dir}/crash-reports.txt"
+          ditto -c -k --keepParent "${app}" "${artifact_dir}/SkinDeepEngineLinkProbe.app.zip"
+
+      - name: Upload startup evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: SkinDeepEngineStartup-simulator
+          path: artifacts/SkinDeepEngineStartup-simulator
+          if-no-files-found: warn
+          retention-days: 14
