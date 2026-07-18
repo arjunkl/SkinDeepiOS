@@ -65,6 +65,88 @@ def main() -> None:
 
     text = replace_once(
         text,
+        'if(DIII4A)\n\tset(JPEG_INCLUDE_DIR "${DIII4A_DEPEND_LIBRARY_PATH}/libjpeg/libjpeg")\n'
+        '\tset(JPEG_LIBRARY "jpeg")',
+        'if(DIII4A)\n\tset(JPEG_INCLUDE_DIR "${DIII4A_DEPEND_LIBRARY_PATH}/libjpeg/libjpeg")\n'
+        '\tif(CMAKE_SYSTEM_NAME STREQUAL "iOS" AND TARGET jpeg)\n'
+        '\t\tset(JPEG_LIBRARY jpeg)\n'
+        '\telse()\n'
+        '\t\tset(JPEG_LIBRARY "jpeg")\n'
+        '\tendif()',
+        "static JPEG target",
+    )
+
+    text = replace_once(
+        text,
+        'if(DIII4A)\n\tset(OGG_INCLUDE_DIR "${DIII4A_DEPEND_LIBRARY_PATH}/libogg/include")\n'
+        '\tset(OGG_LIBRARIES "ogg")',
+        'if(DIII4A)\n\tset(OGG_INCLUDE_DIR "${DIII4A_DEPEND_LIBRARY_PATH}/libogg/include")\n'
+        '\tif(CMAKE_SYSTEM_NAME STREQUAL "iOS" AND TARGET ogg)\n'
+        '\t\tset(OGG_LIBRARIES ogg)\n'
+        '\telse()\n'
+        '\t\tset(OGG_LIBRARIES "ogg")\n'
+        '\tendif()',
+        "static Ogg target",
+    )
+
+    text = replace_once(
+        text,
+        'if(DIII4A)\n\tset(VORBIS_INCLUDE_DIR "${DIII4A_DEPEND_LIBRARY_PATH}/libvorbis/include")\n'
+        '\tset(VORBIS_LIBRARIES "vorbis")',
+        'if(DIII4A)\n\tset(VORBIS_INCLUDE_DIR "${DIII4A_DEPEND_LIBRARY_PATH}/libvorbis/include")\n'
+        '\tif(CMAKE_SYSTEM_NAME STREQUAL "iOS" AND TARGET vorbis)\n'
+        '\t\tset(VORBIS_LIBRARIES vorbis)\n'
+        '\telse()\n'
+        '\t\tset(VORBIS_LIBRARIES "vorbis")\n'
+        '\tendif()',
+        "static Vorbis target",
+    )
+
+    text = replace_once(
+        text,
+        'if(DIII4A)\n\tset(VORBISFILE_INCLUDE_DIR "${DIII4A_DEPEND_LIBRARY_PATH}/libvorbis/include")\n'
+        '\tset(VORBISFILE_LIBRARIES "vorbisfile")',
+        'if(DIII4A)\n\tset(VORBISFILE_INCLUDE_DIR "${DIII4A_DEPEND_LIBRARY_PATH}/libvorbis/include")\n'
+        '\tif(CMAKE_SYSTEM_NAME STREQUAL "iOS" AND TARGET vorbisfile)\n'
+        '\t\tset(VORBISFILE_LIBRARIES vorbisfile)\n'
+        '\telse()\n'
+        '\t\tset(VORBISFILE_LIBRARIES "vorbisfile")\n'
+        '\tendif()',
+        "static Vorbisfile target",
+    )
+
+    text = replace_once(
+        text,
+        'if(DIII4A)\n\tset(OPENAL_INCLUDE_DIR "${DIII4A_DEPEND_INCLUDE_PATH}/openal")\n'
+        '\tset(OPENAL_LIBRARY "openal")',
+        'if(DIII4A)\n\tset(OPENAL_INCLUDE_DIR "${DIII4A_DEPEND_INCLUDE_PATH}/openal")\n'
+        '\tif(CMAKE_SYSTEM_NAME STREQUAL "iOS")\n'
+        '\t\tset(OPENAL_LIBRARY "-framework OpenAL")\n'
+        '\telse()\n'
+        '\t\tset(OPENAL_LIBRARY "openal")\n'
+        '\tendif()',
+        "Apple OpenAL framework",
+    )
+
+    text = replace_once(
+        text,
+        'if(DIII4A)\n\tset(CURL_FOUND True)\n'
+        '\tset(CURL_INCLUDE_DIR "${DIII4A_DEPEND_LIBRARY_PATH}/curl/include")\n'
+        '\tset(CURL_LIBRARY "curl")\nendif()',
+        'if(DIII4A)\n'
+        '\tif(CMAKE_SYSTEM_NAME STREQUAL "iOS")\n'
+        '\t\tset(CURL_FOUND False)\n'
+        '\t\tset(CURL_LIBRARY "")\n'
+        '\telse()\n'
+        '\t\tset(CURL_FOUND True)\n'
+        '\t\tset(CURL_INCLUDE_DIR "${DIII4A_DEPEND_LIBRARY_PATH}/curl/include")\n'
+        '\t\tset(CURL_LIBRARY "curl")\n'
+        '\tendif()\nendif()',
+        "disable curl on iOS",
+    )
+
+    text = replace_once(
+        text,
         '\tset(SDL2_LIBRARY "SDL2")',
         '\tif(CMAKE_SYSTEM_NAME STREQUAL "iOS" AND TARGET SDL2-static)\n'
         '\t\tset(SDL2_LIBRARY SDL2-static)\n'
