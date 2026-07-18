@@ -9,7 +9,15 @@ on:
       - CMakeLists.txt
       - cmake/**
       - scripts/**
-      - .github/workflows/ios-arm64-compile.yml
+      - .github/workflows/**
+  pull_request:
+    branches:
+      - main
+    paths:
+      - CMakeLists.txt
+      - cmake/**
+      - scripts/**
+      - .github/workflows/**
 
 permissions:
   contents: read
@@ -72,6 +80,7 @@ jobs:
           cmake -S . -B build -G Xcode \
             -DCMAKE_TOOLCHAIN_FILE="${PWD}/cmake/ios-arm64.toolchain.cmake" \
             -DENGINE_ROOT="${PWD}/engine" \
+            -DSKINDEEP_BUILD_BOOTSTRAP_APP=OFF \
             -DCMAKE_BUILD_TYPE=Release
 
       - name: Build static engine and hard-linked gameplay code
@@ -105,4 +114,3 @@ jobs:
           path: artifacts/SkinDeepCore-iphoneos-arm64
           if-no-files-found: error
           retention-days: 14
-
